@@ -28,7 +28,7 @@ from mutator import havoc
 
 basedir = '/home/junsun2/fuzz/'
 benchmark_dir = basedir + 'afl_in/ZSTD-DECOMPRESS-1KB' #'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
-benchmark_dir_mutate = benchmark_dir + '/mutate'
+benchmark_dir_mutate = basedir + 'afl_in/mutate/ZSTD-DECOMPRESS-1KB'
 
 lzbench_binary_path = basedir + 'lzbench/lzbench'
 lzbench_result_path = basedir + 'lzbench_result.log'
@@ -47,13 +47,15 @@ args = parser.parse_args()
 # Return throughput and compression ratio
 def run_lzbench(input_file, compress_or_decompress):
     command = None
-    if args.algorithm == 'zstd':
+    if args.algo == 'zstd':
         comp_level = int(input_file.split('_')[1][2:])
-        command = "{lzbench_binary_path} -ezstd,{comp_level} -t1,1 -o4 {benchmark_dir}/{input_file} &> {lzbench_result_path}"
-    elif args.algorithm == 'snappy':
-        command = "{lzbench_binary_path} -esnappy -t1,1 -o4 {benchmark_dir}/{input_file} &> {lzbench_result_path}"
-    process = subprocess.Popen(command)
-    process.wait()
+        result = subprocess.run(\
+        f"{lzbench_binary_path} -ezstd,{comp_level} -t1,1 -o4 {benchmark_dir}/{input_file} > {lzbench_result_path}", \
+        shell=True)
+    elif args.algo == 'snappy':
+        result = subprocess.run(\
+        f"{lzbench_binary_path} -esnappy -t1,1 -o4 {benchmark_dir}/{input_file} > {lzbench_result_path}", \
+        shell=True)
     
     # lzbench_result.log format is like:
     # Compressor name,Compression speed,Decompression speed,Original size,Compressed size,Ratio,Filename

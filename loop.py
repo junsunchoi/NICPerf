@@ -27,6 +27,7 @@ from mutator import havoc
 
 basedir = '~/fuzz/'
 benchmark_dir = basedir + 'afl_in/ZSTD-DECOMPRESS' #'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
+benchmark_dir_mutate = benchmark_dir + '/mutate'
 
 lzbench_binary_path = basedir + 'lzbench/lzbench'
 lzbench_result_path = basedir + 'lzbench_result.log'
@@ -42,12 +43,12 @@ args = parser.parse_args()
 # Algorithm should be a string all in small cases
 # Return throughput and compression ratio
 def run_lzbench(input_file, compress_or_decompress):
-    if args.algorithm is 'zstd':
+    if args.algorithm == 'zstd':
         comp_level = int(input_file.split('_')[1][2:])
         subprocess.run(\
         f"{lzbench_binary_path} -ezstd,{comp_level} -t1,1 -o4 {benchmark_dir}/{input_file} &> {lzbench_result_path}", \
         shell=True)
-    elif args.algorithm is 'snappy':
+    elif args.algorithm == 'snappy':
         subprocess.run(\
         f"{lzbench_binary_path} -esnappy -t1,1 -o4 {benchmark_dir}/{input_file} &> {lzbench_result_path}", \
         shell=True)
@@ -60,7 +61,7 @@ def run_lzbench(input_file, compress_or_decompress):
         lines = file.readlines()
         third_line = lines[2]
         throughput = 0.0
-        if compress_or_decompress is 'compress':
+        if compress_or_decompress == 'compress':
             throughput = float(third_line.split(',')[1])
         else:
             throughput = float(third_line.split(',')[2])
@@ -97,8 +98,7 @@ def main():
         # filename is like '009488_cl1_ws10'
         comp_level = int(filename.split('_')[1][2:])
         throughput, comp_ratio, uncomp_size = run_lzbench(filename)
-        perf_dict[int(throughput)//10] = throughput
-    
+        perf_dict[int(throughput)//10] = throughput    
         file_queue_dict['filename'] = \
             [{'original_file': filename, 
             'throughput': throughput, 
@@ -106,6 +106,8 @@ def main():
             'uncomp_size': uncomp_size, 
             'comp_level': comp_level,
             'mutation_cycle': 0}]
+        subprocess.run(f"cp {benchmark_dir}/filename {benchmark_dir_mutate}/filename--0", \
+            shell=True)
         
     # Backup the performance numbers of the original benchmark files
     perf_dict_original = perf_dict.copy()
@@ -116,10 +118,10 @@ def main():
         # Do for the 1th ~ nth queue cycle
         for queue_cycle in range(1, 1+args.num_loops):
             # Select a file from the last queue cycle (most recent version)
-            most_recent_filename = file_queue_dict[filename][-1]['original_file'] + '_' + \
+            most_recent_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
                 str(file_queue_dict[filename][-1]['mutation_cycle'])
             most_recent_filepath = benchmark_dir + '/' + most_recent_filename
-            new_filename = file_queue_dict[filename][-1]['original_file'] + '_' + \
+            new_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
                 str(file_queue_dict[filename][-1]['mutation_cycle']+1)
             new_filepath = benchmark_dir + '/' + new_filename
 

@@ -178,14 +178,14 @@ def havoc(r, filename, afl_struct: afl):
 # Output length increase by clone_length
 # Case 1: repeat a value from 0~255
 # Case 2: repeat a value from a random position of the file
-    elif r is 47:
+    elif r == 47:
         with open(filename, "rb") as f:
             data = bytearray(f.read())
         file_size_bytes = len(data)
         if file_size_bytes + HAVOC_BLK_XL < MAX_FILE:
             clone_len = choose_block_len(HAVOC_BLK_XL)
             clone_to = rand_below(file_size_bytes)
-            if rand_below(2) is 0:
+            if rand_below(2) == 0:
                 byte_to_clone = rand_below(256)
             else:
                 byte_to_clone = data[rand_below(file_size_bytes)]
@@ -208,13 +208,13 @@ def havoc(r, filename, afl_struct: afl):
                     f.write(data)
 # 51: Repeat a particular byte like 47, but overwrite from a random position of the file
 # Output length same
-    elif r is 51:
+    elif r == 51:
         with open(filename, "rb") as f:
             data = bytearray(f.read())
         file_size_bytes = len(data)
         copy_len = choose_block_len(file_size_bytes-1)
         copy_to = rand_below(file_size_bytes-copy_len+1)
-        if rand_below(2) is 0:
+        if rand_below(2) == 0:
             byte_to_clone = rand_below(256)
         else:
             byte_to_clone = data[rand_below(file_size_bytes)]
@@ -228,9 +228,9 @@ def havoc(r, filename, afl_struct: afl):
         with open(filename, "rb") as f:
             data = bytearray(f.read())
         file_size_bytes = len(data)
-        if r is 52:
+        if r == 52:
             data[rand_below(file_size_bytes)] += 1
-        elif r is 53:
+        elif r == 53:
             data[rand_below(file_size_bytes)] -= 1
         else:
             data[rand_below(file_size_bytes)] ^= 0xff

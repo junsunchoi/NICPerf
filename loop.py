@@ -27,7 +27,7 @@ from mutator import havoc
 # Assume that this file is at "~/fuzz"
 
 basedir = '/home/junsun2/fuzz/'
-benchmark_dir = basedir + 'afl_in/ZSTD-DECOMPRESS' #'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
+benchmark_dir = basedir + 'afl_in/ZSTD-DECOMPRESS-1KB' #'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
 benchmark_dir_mutate = benchmark_dir + '/mutate'
 
 lzbench_binary_path = basedir + 'lzbench/lzbench'
@@ -37,8 +37,10 @@ fuzz_result_path = basedir + 'fuzz_result.csv'
 parser = argparse.ArgumentParser()
 parser.add_argument("--algo", help="zstd or snappy", default="zstd", type=str)
 parser.add_argument("--cord", help="compress or decompress", default="decompress", type=str)
-parser.add_argument("--n", help="Number of mutations to run per file", \
+parser.add_argument("--queue-cycles", help="Queue cycles for the whole benchmark files", \
                     default=10, type=int)
+parser.add_argument("--n", help="Number of mutations to run per file", \
+                    default=1, type=int)
 args = parser.parse_args()
 
 # Algorithm should be a string all in small cases
@@ -98,7 +100,11 @@ def main():
 
     # Do for the 0th queue cycle
     print('Queue cycle: ', 0, datetime.now().time())
+    filecount = 0
     for filename in filelist:
+        filecount += 1
+        if filecount % 1000 == 0:
+            print('filecount is ', filecount, datetime.now().time())
         # filename is like '009488_cl1_ws10'
         comp_level = int(filename.split('_')[1][2:])
         throughput, comp_ratio, uncomp_size = run_lzbench(filename, args.cord)
@@ -117,11 +123,15 @@ def main():
     perf_dict_original = perf_dict.copy()
 
     # Do for the 1th ~ nth queue cycle
-    for queue_cycle in range(1, 1+args.num_loops):
+    for queue_cycle in range(1, 1+args.queue_cycles):
         print('Queue cycle: ', queue_cycle, datetime.now().time())
+        filecount = 0
         # For all files in the benchmark directory, do the following:
         # (Originally, we have to select random files from the benchmark directory)
         for filename in filelist:
+            filecount += 1
+            if filecount % 1000 == 0:
+                print('filecount is ', filecount, datetime.now().time())
             # Select a file from the last queue cycle (most recent version)
             most_recent_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
                 str(file_queue_dict[filename][-1]['mutation_cycle'])
@@ -134,8 +144,9 @@ def main():
             subprocess.run(f"cp {most_recent_filepath} {new_filepath}/", \
                         shell=True)
             
-            # Mutate the file
-            havoc(rand_below(65), new_filepath)
+            # Mutate the file n times
+            for i in range(args.n):
+                havoc(rand_below(65), new_filepath)
 
             # Run lzbench on the new file
             comp_level = int(new_filename.split('_')[1][2:])

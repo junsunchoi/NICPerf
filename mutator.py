@@ -39,7 +39,8 @@ def choose_block_len(limit, queue_cycle=2, takes_too_long=False):
         min_value = 1
     return min_value + rand_below(min(max_value, limit) - min_value + 1)
 
-def havoc(r, filename, afl_struct: afl):
+#def havoc(r, filename, afl_struct: afl):
+def havoc(r, filename):
 # 0~3: Flip a random bit
     if r in range(0, 4):
         # Open the file in binary mode
@@ -272,12 +273,12 @@ def havoc(r, filename, afl_struct: afl):
     else:
         pass
 
-def main():
-    print('Hello World!')
-    afl_struct = afl.afl_struct
-    filename = 'test'
-    havoc(11, filename, afl_struct)
+# def main():
+#     # print('Hello World!')
+#     # afl_struct = afl.afl_struct
+#     # filename = 'test'
+#     # havoc(11, filename, afl_struct)
     
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

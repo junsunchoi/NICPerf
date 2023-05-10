@@ -2,6 +2,7 @@ import os
 import subprocess
 import argparse
 from secrets import randbelow as rand_below
+import csv
 from mutator import havoc
 
 # 0th queue cycle
@@ -15,7 +16,7 @@ from mutator import havoc
 # otherwise discard
 
 # 1: Number of loops to run?
-# --> Default 64, but can be changed by the user
+# --> Default 10, but can be changed by the user
 # 2: Per one run, how many "mutation+run"s to perform?
 # --> One.
 # 3: Do we run the feedback loop for all the files in the queue,
@@ -24,15 +25,18 @@ from mutator import havoc
 
 # Assume that this file is at "~/fuzz"
 
-benchmark_dir = 'afl_in/ZSTD-DECOMPRESS'
-#benchmark_dir = 'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
-lzbench_binary_path = 'lzbench/lzbench'
-lzbench_result_path = 'lzbench_result.log'
+basedir = '~/fuzz/'
+benchmark_dir = basedir + 'afl_in/ZSTD-DECOMPRESS' #'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
+
+lzbench_binary_path = basedir + 'lzbench/lzbench'
+lzbench_result_path = basedir + 'lzbench_result.log'
+fuzz_result_path = basedir + 'fuzz_result.csv'
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--algorithm", help="zstd or snappy", default="zstd", type=str)
+parser.add_argument("--algo", help="zstd or snappy", default="zstd", type=str)
 parser.add_argument("--cord", help="compress or decompress", default="decompress", type=str)
-parser.add_argument("--num_loops", help="Number of mutations to run per file", default=64, type=int)
+parser.add_argument("--n", help="Number of mutations to run per file", \
+                    default=10, type=int)
 args = parser.parse_args()
 
 # Algorithm should be a string all in small cases
@@ -64,6 +68,17 @@ def run_lzbench(input_file, compress_or_decompress):
         comp_ratio = float(third_line.split(',')[5])
         
     return throughput, uncomp_size, comp_ratio
+
+def write_result(file_queue_dict):
+    with open(fuzz_result_path, 'w') as file:
+        writer = csv.writer(file)
+        writer.writerow(['original_file', 'throughput', 'uncomp_size', 'comp_ratio', 'comp_level', 'mutation_cycle'])
+        for filename in file_queue_dict.keys():
+            for file_perf_dict in file_queue_dict[filename]:
+                writer.writerow([file_perf_dict['original_file'], file_perf_dict['throughput'], \
+                    file_perf_dict['uncomp_size'], file_perf_dict['comp_ratio'], \
+                    file_perf_dict['comp_level'], file_perf_dict['mutation_cycle']])
+
 def main():
     # Create a queue.
     # Each element is a list of dictionaries of the following format:
@@ -73,6 +88,7 @@ def main():
     # Create a list of performance numbers
     # Contain only 1 file per 10MB/s (ex: 100~110MB/s)
     perf_dict = dict()
+    new_file_count = 0
 
     filelist = os.listdir(benchmark_dir)
 
@@ -84,22 +100,27 @@ def main():
         perf_dict[int(throughput)//10] = throughput
     
         file_queue_dict['filename'] = \
-            [].append({'original_file': filename, 
-                    'throughput': throughput, 
-                    'comp_ratio': comp_ratio, 
-                    'uncomp_size': uncomp_size, 
-                    'comp_level': comp_level,
-                    'mutation_cycle': 0})
+            [{'original_file': filename, 
+            'throughput': throughput, 
+            'comp_ratio': comp_ratio, 
+            'uncomp_size': uncomp_size, 
+            'comp_level': comp_level,
+            'mutation_cycle': 0}]
         
-    for dictlist in file_queue_dict:
-        # Do for the 1th ~nth queue cycle
+    # Backup the performance numbers of the original benchmark files
+    perf_dict_original = perf_dict.copy()
+
+    # For all files in the benchmark directory, do the following:
+    for filename in filelist:
+
+        # Do for the 1th ~ nth queue cycle
         for queue_cycle in range(1, 1+args.num_loops):
             # Select a file from the last queue cycle (most recent version)
-            most_recent_filename = dictlist[-1]['original_file'] + '_' + \
-                str(dictlist[-1]['mutation_cycle'])
+            most_recent_filename = file_queue_dict[filename][-1]['original_file'] + '_' + \
+                str(file_queue_dict[filename][-1]['mutation_cycle'])
             most_recent_filepath = benchmark_dir + '/' + most_recent_filename
-            new_filename = dictlist[-1]['original_file'] + '_' + \
-                str(dictlist[-1]['mutation_cycle']+1)
+            new_filename = file_queue_dict[filename][-1]['original_file'] + '_' + \
+                str(file_queue_dict[filename][-1]['mutation_cycle']+1)
             new_filepath = benchmark_dir + '/' + new_filename
 
             # Copy the original file
@@ -117,16 +138,20 @@ def main():
             # Otherwise, discard
             if int(throughput)//10 not in perf_dict.keys():
                 perf_dict[int(throughput)//10] = throughput
-                original_filename = dictlist[-1]['original_file'] 
-                file_queue_dict[original_filename].append(
+                original_filename = file_queue_dict[filename][-1]['original_file'] 
+                file_queue_dict[filename][original_filename].append(
                     {'original_file': original_filename, 
                     'throughput': throughput, 
                     'comp_ratio': comp_ratio, 
                     'uncomp_size': uncomp_size, 
                     'comp_level': comp_level,
                     'mutation_cycle': queue_cycle})
+                new_file_count += 1
             else:
                 subprocess.run(f"rm {new_filepath}", shell=True)
+
+    print('New files found: ', new_file_count)
+    write_result(file_queue_dict)
     
 if __name__ == "__main__":
     main()

@@ -46,7 +46,6 @@ args = parser.parse_args()
 # Algorithm should be a string all in small cases
 # Return throughput and compression ratio
 def run_lzbench(input_file, compress_or_decompress):
-<<<<<<< HEAD
     command = None
     if args.algorithm == 'zstd':
         comp_level = int(input_file.split('_')[1][2:])
@@ -56,18 +55,6 @@ def run_lzbench(input_file, compress_or_decompress):
     process = subprocess.Popen(command)
     process.wait()
     
-=======
-    if args.algo == 'zstd':
-        comp_level = int(input_file.split('_')[1][2:])
-        result = subprocess.run(\
-        f"{lzbench_binary_path} -ezstd,{comp_level} -t1,1 -o4 {benchmark_dir}/{input_file} > {lzbench_result_path}", \
-        shell=True)
-    elif args.algo == 'snappy':
-        result = subprocess.run(\
-        f"{lzbench_binary_path} -esnappy -t1,1 -o4 {benchmark_dir}/{input_file} > {lzbench_result_path}", \
-        shell=True)
-
->>>>>>> d801cf30fe199dd953fc5356c09ea92db8c43a7e
     # lzbench_result.log format is like:
     # Compressor name,Compression speed,Decompression speed,Original size,Compressed size,Ratio,Filename
     # memcpy line

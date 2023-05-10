@@ -45,12 +45,12 @@ args = parser.parse_args()
 def run_lzbench(input_file, compress_or_decompress):
     if args.algo == 'zstd':
         comp_level = int(input_file.split('_')[1][2:])
-        subprocess.run(\
-        f"{lzbench_binary_path} -ezstd,{comp_level} -t1,1 -o4 {benchmark_dir}/{input_file} &> {lzbench_result_path}", \
+        result = subprocess.run(\
+        f"{lzbench_binary_path} -ezstd,{comp_level} -t1,1 -o4 {benchmark_dir}/{input_file} > {lzbench_result_path}", \
         shell=True)
     elif args.algo == 'snappy':
-        subprocess.run(\
-        f"{lzbench_binary_path} -esnappy -t1,1 -o4 {benchmark_dir}/{input_file} &> {lzbench_result_path}", \
+        result = subprocess.run(\
+        f"{lzbench_binary_path} -esnappy -t1,1 -o4 {benchmark_dir}/{input_file} > {lzbench_result_path}", \
         shell=True)
 
     # lzbench_result.log format is like:
@@ -106,7 +106,7 @@ def main():
             'uncomp_size': uncomp_size, 
             'comp_level': comp_level,
             'mutation_cycle': 0}]
-        subprocess.run(f"cp {benchmark_dir}/filename {benchmark_dir_mutate}/filename--0", \
+        subprocess.run(f"cp {benchmark_dir}/{filename} {benchmark_dir_mutate}/{filename}--0", \
             shell=True)
         
     # Backup the performance numbers of the original benchmark files

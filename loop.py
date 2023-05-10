@@ -25,7 +25,7 @@ from mutator import havoc
 
 # Assume that this file is at "~/fuzz"
 
-basedir = 'home/junsun2/fuzz/'
+basedir = '/home/junsun2/fuzz/'
 benchmark_dir = basedir + 'afl_in/ZSTD-DECOMPRESS' #'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
 benchmark_dir_mutate = benchmark_dir + '/mutate'
 
@@ -43,12 +43,12 @@ args = parser.parse_args()
 # Algorithm should be a string all in small cases
 # Return throughput and compression ratio
 def run_lzbench(input_file, compress_or_decompress):
-    if args.algorithm == 'zstd':
+    if args.algo == 'zstd':
         comp_level = int(input_file.split('_')[1][2:])
         subprocess.run(\
         f"{lzbench_binary_path} -ezstd,{comp_level} -t1,1 -o4 {benchmark_dir}/{input_file} &> {lzbench_result_path}", \
         shell=True)
-    elif args.algorithm == 'snappy':
+    elif args.algo == 'snappy':
         subprocess.run(\
         f"{lzbench_binary_path} -esnappy -t1,1 -o4 {benchmark_dir}/{input_file} &> {lzbench_result_path}", \
         shell=True)
@@ -97,7 +97,7 @@ def main():
     for filename in filelist:
         # filename is like '009488_cl1_ws10'
         comp_level = int(filename.split('_')[1][2:])
-        throughput, comp_ratio, uncomp_size = run_lzbench(filename)
+        throughput, comp_ratio, uncomp_size = run_lzbench(filename, args.cord)
         perf_dict[int(throughput)//10] = throughput    
         file_queue_dict['filename'] = \
             [{'original_file': filename, 

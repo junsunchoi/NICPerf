@@ -3,6 +3,7 @@ import subprocess
 import argparse
 from secrets import randbelow as rand_below
 import csv
+from datetime import datetime
 from mutator import havoc
 
 # 0th queue cycle
@@ -92,8 +93,11 @@ def main():
     new_file_count = 0
 
     filelist = os.listdir(benchmark_dir)
+    subprocess.run(f"rm -rf {benchmark_dir_mutate}", shell=True)
+    subprocess.run(f"mkdir {benchmark_dir_mutate}", shell=True)
 
     # Do for the 0th queue cycle
+    print('Queue cycle: ', 0, datetime.now().time())
     for filename in filelist:
         # filename is like '009488_cl1_ws10'
         comp_level = int(filename.split('_')[1][2:])
@@ -112,11 +116,12 @@ def main():
     # Backup the performance numbers of the original benchmark files
     perf_dict_original = perf_dict.copy()
 
-    # For all files in the benchmark directory, do the following:
-    for filename in filelist:
-
-        # Do for the 1th ~ nth queue cycle
-        for queue_cycle in range(1, 1+args.num_loops):
+    # Do for the 1th ~ nth queue cycle
+    for queue_cycle in range(1, 1+args.num_loops):
+        print('Queue cycle: ', queue_cycle, datetime.now().time())
+        # For all files in the benchmark directory, do the following:
+        # (Originally, we have to select random files from the benchmark directory)
+        for filename in filelist:
             # Select a file from the last queue cycle (most recent version)
             most_recent_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
                 str(file_queue_dict[filename][-1]['mutation_cycle'])

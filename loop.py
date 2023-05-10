@@ -25,7 +25,7 @@ from mutator import havoc
 
 # Assume that this file is at "~/fuzz"
 
-basedir = '~/fuzz/'
+basedir = 'home/junsun2/fuzz/'
 benchmark_dir = basedir + 'afl_in/ZSTD-DECOMPRESS' #'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
 benchmark_dir_mutate = benchmark_dir + '/mutate'
 

@@ -110,7 +110,7 @@ def main():
         comp_level = int(filename.split('_')[1][2:])
         throughput, comp_ratio, uncomp_size = run_lzbench(filename, args.cord)
         perf_dict[int(throughput)//10] = throughput    
-        file_queue_dict['filename'] = \
+        file_queue_dict[filename] = \
             [{'original_file': filename, 
             'throughput': throughput, 
             'comp_ratio': comp_ratio, 

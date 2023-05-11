@@ -31,6 +31,13 @@ parser.add_argument("--queue-cycles", help="Queue cycles for the whole benchmark
                     default=2, type=int)
 parser.add_argument("--n", help="Number of mutations to run per file", \
                     default=1, type=int)
+parser.add_argument("--newonly", help="Whether to only run loop on newly found files or not", \
+    action='store_true', default=False)
+parser.add_argument("--bigfiles", help="If true, run loop on 4KB+ files. If false, run on 1KB files", \
+    action='store_true', default=False)
+parser.add_argument("--no-delete", help="Exclude deletion in havoc", \
+    action='store_true', default=False)
+
 args = parser.parse_args()
 
 basedir = '/home/junsun2/fuzz/'
@@ -38,15 +45,21 @@ setting = ''
 setting += ('ZSTD' if args.algo=='zstd' else 'Snappy')
 setting += '-'
 setting += ('COMPRESS' if args.cord=='compress' else 'DECOMPRESS')
-setting += '-1KB'
+setting += '-4KBplus' if args.bigfiles else '-1KB'
 benchmark_dir = basedir + 'afl_in/' + setting
-benchmark_dir_mutate = basedir + 'afl_in/mutate/' + setting
+benchmark_dir_mutate = basedir + 'afl_in/mutate/newonly/' + setting \
+    if args.newonly else \
+    basedir + 'afl_in/mutate/' + setting
 
 lzbench_binary_path = basedir + 'lzbench/lzbench'
-lzbench_result_path = basedir + args.algo + '_' + args.cord + '_' + \
-    'cycle' + str(args.queue_cycles) + '_n' + str(args.n) + 'lzbench_result.log'
+lzbench_result_path = basedir + 'lzbench_result/' + args.algo + '_' + args.cord + '_' + \
+    'cycle' + str(args.queue_cycles) + '_n' + str(args.n)
+lzbench_result_path += ('_4KBplus_' if args.bigfiles else '_')
+lzbench_result_path += 'lzbench_result' + ('newonly.log' if args.newonly else '.log')
 fuzz_result_path = basedir + 'result/' + args.algo + '_' + args.cord + '_' + \
-    'cycle' + str(args.queue_cycles) + '_n' + str(args.n) + '.csv'
+    'cycle' + str(args.queue_cycles) + '_n' + str(args.n)
+fuzz_result_path += ('_4KBplus_' if args.bigfiles else '_')
+fuzz_result_path += '._newonly.csv' if args.newonly else '.csv'
 file_queue_dict = dict()
 perf_dict = dict()
 
@@ -141,6 +154,7 @@ def main():
             filecount += 1
             if filecount % 1000 == 0:
                 print('filecount is ', filecount, datetime.now().time())
+            
             # Select a file from the last queue cycle (most recent version)
             most_recent_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
                 str(file_queue_dict[filename][-1]['mutation_cycle'])
@@ -149,35 +163,44 @@ def main():
                 str(queue_cycle)
             new_filepath = benchmark_dir_mutate + '/' + new_filename
 
-            # Copy the original file
-            subprocess.run(f"cp {most_recent_filepath} {new_filepath}", \
-                        shell=True)
-            
-            # Mutate the file n times
-            for i in range(args.n):
-                havoc(rand_below(65), new_filepath)
+            condition = (args.newonly and \
+                file_queue_dict[filename][-1]['mutation_cycle']+1 == queue_cycle) or \
+                (not args.newonly)
+            if condition:
+                # Copy the original file
+                subprocess.run(f"cp {most_recent_filepath} {new_filepath}", \
+                            shell=True)
+                
+                # Mutate the file n times
+                for i in range(args.n):
+                    if args.no_delete:
+                        havoc(rand_below(57), new_filepath)
+                    else:
+                        havoc(rand_below(65), new_filepath)
 
-            # Run lzbench on the new file
-            comp_level = int(new_filename.split('_')[1][2:])
-            # comp_level should match filename or most_recent_filename's split('_')[1][2:]
-            throughput, comp_ratio, uncomp_size = run_lzbench(new_filepath, args.cord)
+                # Run lzbench on the new file
+                comp_level = int(new_filename.split('_')[1][2:])
+                # comp_level should match filename or most_recent_filename's split('_')[1][2:]
+                throughput, comp_ratio, uncomp_size = run_lzbench(new_filepath, args.cord)
 
-            # If the new file is unique, add to the queue
-            # Otherwise, discard
-            if int(throughput)//10 not in perf_dict.keys():
-                perf_dict[int(throughput)//10] = throughput
-                original_filename = file_queue_dict[filename][-1]['original_file']
-                assert filename==original_filename, "filename should match with original_filename"
-                file_queue_dict[filename].append(
-                    {'original_file': original_filename, 
-                    'throughput': throughput, 
-                    'comp_ratio': comp_ratio, 
-                    'uncomp_size': uncomp_size, 
-                    'comp_level': comp_level,
-                    'mutation_cycle': queue_cycle})
-                new_file_count += 1
-            else:
-                subprocess.run(f"rm {new_filepath}", shell=True)
+                # If the new file is unique, add to the queue
+                # Otherwise, discard
+                # Check if comp ratio is in a valid range
+                if int(throughput)//10 not in perf_dict.keys(): #\
+                    #and 0 <= comp_ratio <= 110:
+                    perf_dict[int(throughput)//10] = throughput
+                    original_filename = file_queue_dict[filename][-1]['original_file']
+                    assert filename==original_filename, "filename should match with original_filename"
+                    file_queue_dict[filename].append(
+                        {'original_file': original_filename, 
+                        'throughput': throughput, 
+                        'comp_ratio': comp_ratio, 
+                        'uncomp_size': uncomp_size, 
+                        'comp_level': comp_level,
+                        'mutation_cycle': queue_cycle})
+                    new_file_count += 1
+                else:
+                    subprocess.run(f"rm {new_filepath}", shell=True)
 
         # Checkpoint the results per every queue cycle
         print('New files found: ', new_file_count)

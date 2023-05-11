@@ -83,12 +83,11 @@ def write_result(file_queue_dict):
         writer = csv.writer(file)
         writer.writerow(['original_file', 'throughput', 'uncomp_size', 'comp_ratio', 'comp_level', 'mutation_cycle'])
         for filename in file_queue_dict.keys():
-            for file_perf_dict_list in file_queue_dict[filename]:
+            for file_perf_dict in file_queue_dict[filename]:
             # file_queue_dict[filename] is a list of dicts
-                for file_perf_dict in file_perf_dict_list:
-                    writer.writerow([file_perf_dict['original_file'], file_perf_dict['throughput'], \
-                        file_perf_dict['uncomp_size'], file_perf_dict['comp_ratio'], \
-                        file_perf_dict['comp_level'], file_perf_dict['mutation_cycle']])
+                writer.writerow([file_perf_dict['original_file'], file_perf_dict['throughput'], \
+                    file_perf_dict['uncomp_size'], file_perf_dict['comp_ratio'], \
+                    file_perf_dict['comp_level'], file_perf_dict['mutation_cycle']])
 
 def main():
     # Create a queue.

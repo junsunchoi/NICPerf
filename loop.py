@@ -17,22 +17,12 @@ from mutator import havoc
 # otherwise discard
 
 # 1: Number of loops to run?
-# --> Default 10, but can be changed by the user
+# --> Default 2, but can be changed by the user
 # 2: Per one run, how many "mutation+run"s to perform?
 # --> One.
 # 3: Do we run the feedback loop for all the files in the queue,
 # or only for the files that are newly added to the queue?
-# --> Newly added files only.
-
-basedir = '/home/junsun2/fuzz/'
-benchmark_dir = basedir + 'afl_in/ZSTD-DECOMPRESS-1KB' #'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
-benchmark_dir_mutate = basedir + 'afl_in/mutate/ZSTD-DECOMPRESS-1KB'
-
-lzbench_binary_path = basedir + 'lzbench/lzbench'
-lzbench_result_path = basedir + 'lzbench_result.log'
-fuzz_result_path = basedir + 'fuzz_result.csv'
-file_queue_dict = dict()
-perf_dict = dict()
+# --> Most recent mutation that resulted in unique performance per each original file
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--algo", help="zstd or snappy", default="zstd", type=str)
@@ -43,10 +33,24 @@ parser.add_argument("--n", help="Number of mutations to run per file", \
                     default=1, type=int)
 args = parser.parse_args()
 
+basedir = '/home/junsun2/fuzz/'
+setting = ''
+setting += ('ZSTD' if args.algo=='zstd' else 'Snappy')
+setting += '-'
+setting += ('COMPRESS' if args.cord=='compress' else 'DECOMPRESS')
+setting += '-1KB'
+benchmark_dir = basedir + 'afl_in/' + setting
+benchmark_dir_mutate = basedir + 'afl_in/mutate/' + setting
+
+lzbench_binary_path = basedir + 'lzbench/lzbench'
+lzbench_result_path = basedir + 'lzbench_result.log'
+fuzz_result_path = basedir + 'fuzz_result.csv'
+file_queue_dict = dict()
+perf_dict = dict()
+
 # Algorithm should be a string all in small cases
 # Return throughput and compression ratio
 def run_lzbench(input_path, compress_or_decompress):
-    command = None
     if args.algo == 'zstd':
         comp_level = int(input_path.split('/')[-1].split('_')[1][2:])
         result = subprocess.run(\
@@ -79,10 +83,12 @@ def write_result(file_queue_dict):
         writer = csv.writer(file)
         writer.writerow(['original_file', 'throughput', 'uncomp_size', 'comp_ratio', 'comp_level', 'mutation_cycle'])
         for filename in file_queue_dict.keys():
-            for file_perf_dict in file_queue_dict[filename]:
-                writer.writerow([file_perf_dict['original_file'], file_perf_dict['throughput'], \
-                    file_perf_dict['uncomp_size'], file_perf_dict['comp_ratio'], \
-                    file_perf_dict['comp_level'], file_perf_dict['mutation_cycle']])
+            for file_perf_dict_list in file_queue_dict[filename]:
+            # file_queue_dict[filename] is a list of dicts
+                for file_perf_dict in file_perf_dict_list:
+                    writer.writerow([file_perf_dict['original_file'], file_perf_dict['throughput'], \
+                        file_perf_dict['uncomp_size'], file_perf_dict['comp_ratio'], \
+                        file_perf_dict['comp_level'], file_perf_dict['mutation_cycle']])
 
 def main():
     # Create a queue.
@@ -152,14 +158,16 @@ def main():
 
             # Run lzbench on the new file
             comp_level = int(new_filename.split('_')[1][2:])
+            # comp_level should match filename or most_recent_filename's split('_')[1][2:]
             throughput, comp_ratio, uncomp_size = run_lzbench(new_filepath, args.cord)
 
             # If the new file is unique, add to the queue
             # Otherwise, discard
             if int(throughput)//10 not in perf_dict.keys():
                 perf_dict[int(throughput)//10] = throughput
-                original_filename = file_queue_dict[filename][-1]['original_file'] 
-                file_queue_dict[filename][original_filename].append(
+                original_filename = file_queue_dict[filename][-1]['original_file']
+                assert filename==original_filename, "filename should match with original_filename"
+                file_queue_dict[filename].append(
                     {'original_file': original_filename, 
                     'throughput': throughput, 
                     'comp_ratio': comp_ratio, 

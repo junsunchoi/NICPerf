@@ -5,13 +5,16 @@ import afl
 from secrets import randbelow as rand_below
 import struct
 
+TWO_8 = 256
+TWO_16 = 65536
+TWO_32 = 4294967296
+
 #interesting_8 = [-128, -1, 0, 1, 16, 32, 64, 100, 127]
 interesting_8 = [128, 255, 0, 1, 16, 32, 64, 100, 127]
 #interesting_16 = [-32768, -129, -128, 255, 256, 512, 1000, 1024, 4096, 32767]
 interesting_16 = [32768, 65407, 65408, 255, 256, 512, 1000, 1024, 4096, 32767]
 #interesting_32 = [-2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647]
 interesting_32 = [2147483648, 4194304250, 4294934527, 32768, 65535, 65536, 100663045, 2147483647]
-
 
 HAVOC_BLK_SMALL = 32
 HAVOC_BLK_MEDIUM = 128
@@ -49,9 +52,9 @@ def havoc(r, filename):
     if r in range(0, 4):
         # Open the file in binary mode
         with open(filename, "rb+") as f:
-            # Print original contents
-            file_contents = f.read()
-            print('Original contents:', file_contents) ################ For debugging
+            # Print original contents ################ For debugging
+            ########### file_contents = f.read()
+            ########### print('Original contents:', file_contents) 
 
             # Get the size of the file in bits
             file_size_bits = os.path.getsize(filename) * 8
@@ -111,9 +114,9 @@ def havoc(r, filename):
         file_size_bytes = len(data)
         byte_pos = rand_below(file_size_bytes)
         if r in range(16, 20):
-            data[byte_pos] -= rand_below(35)+1
+            data[byte_pos] = (data[byte_pos] - (rand_below(35)+1))%256
         else:
-            data[byte_pos] += rand_below(35)+1
+            data[byte_pos] = (data[byte_pos] + (rand_below(35)+1))%256
         with open(filename, "wb") as f:
             f.write(data)
 # 24~25: Subtract 1~35 from a word(16b) (Little Endian)
@@ -127,13 +130,13 @@ def havoc(r, filename):
                 byte_pos = rand_below(file_size_bytes-1)
                 f.seek(byte_pos)
                 if r in range(24, 26):
-                    new_data = (struct.unpack('<H', f.read(2))[0] - rand_below(35)-1).to_bytes(2, byteorder='little')
+                    new_data = ((struct.unpack('<H', f.read(2))[0] - rand_below(35)-1)%TWO_16).to_bytes(2, byteorder='little')
                 elif r in range(26, 28):
-                    new_data = (struct.unpack('>H', f.read(2))[0] - rand_below(35)-1).to_bytes(2, byteorder='big')
+                    new_data = ((struct.unpack('>H', f.read(2))[0] - rand_below(35)-1)%TWO_16).to_bytes(2, byteorder='big')
                 elif r in range(28, 30):
-                    new_data = (struct.unpack('<H', f.read(2))[0] + rand_below(35)+1).to_bytes(2, byteorder='little')
+                    new_data = ((struct.unpack('<H', f.read(2))[0] + rand_below(35)+1)%TWO_16).to_bytes(2, byteorder='little')
                 else:
-                    new_data = (struct.unpack('>H', f.read(2))[0] + rand_below(35)+1).to_bytes(2, byteorder='big')
+                    new_data = ((struct.unpack('>H', f.read(2))[0] + rand_below(35)+1)%TWO_16).to_bytes(2, byteorder='big')
                 f.seek(byte_pos)
                 f.write(new_data)
 # 32~33: Subtract 1~35 from a dword(32b) (Little Endian)
@@ -147,13 +150,13 @@ def havoc(r, filename):
                 byte_pos = rand_below(file_size_bytes-3)
                 f.seek(byte_pos)
                 if r in range(32, 34):
-                    new_data = (struct.unpack('<I', f.read(4))[0] - rand_below(35)-1).to_bytes(4, byteorder='little')
+                    new_data = ((struct.unpack('<I', f.read(4))[0] - rand_below(35)-1)%TWO_32).to_bytes(4, byteorder='little')
                 elif r in range(34, 36):
-                    new_data = (struct.unpack('>I', f.read(4))[0] - rand_below(35)-1).to_bytes(4, byteorder='big')
+                    new_data = ((struct.unpack('>I', f.read(4))[0] - rand_below(35)-1)%TWO_32).to_bytes(4, byteorder='big')
                 elif r in range(36, 38):
-                    new_data = (struct.unpack('<I', f.read(4))[0] + rand_below(35)+1).to_bytes(4, byteorder='little')
+                    new_data = ((struct.unpack('<I', f.read(4))[0] + rand_below(35)+1)%TWO_32).to_bytes(4, byteorder='little')
                 else:
-                    new_data = (struct.unpack('>I', f.read(4))[0] + rand_below(35)+1).to_bytes(4, byteorder='big')
+                    new_data = ((struct.unpack('>I', f.read(4))[0] + rand_below(35)+1)%TWO_32).to_bytes(4, byteorder='big')
                 f.seek(byte_pos)
                 f.write(new_data)
 # 40~43: Set a byte(8b) to a random value(1~255)
@@ -234,9 +237,9 @@ def havoc(r, filename):
             data = bytearray(f.read())
         file_size_bytes = len(data)
         if r == 52:
-            data[rand_below(file_size_bytes)] += 1
+            data[rand_below(file_size_bytes)] = (data[rand_below(file_size_bytes)]+1)%256
         elif r == 53:
-            data[rand_below(file_size_bytes)] -= 1
+            data[rand_below(file_size_bytes)] = (data[rand_below(file_size_bytes)]-1)%256
         else:
             data[rand_below(file_size_bytes)] ^= 0xff
         with open(filename, "wb") as f:

@@ -17,7 +17,7 @@ from mutator import havoc
 # otherwise discard
 
 # 1: Number of loops to run?
-# --> Default 2, but can be changed by the user
+# --> Default 10, but can be changed by the user
 # 2: Per one run, how many "mutation+run"s to perform?
 # --> One.
 # 3: Do we run the feedback loop for all the files in the queue,
@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--algo", help="zstd or snappy", default="zstd", type=str)
 parser.add_argument("--cord", help="compress or decompress", default="decompress", type=str)
 parser.add_argument("--queue-cycles", help="Queue cycles for the whole benchmark files", \
-                    default=2, type=int)
+                    default=10, type=int)
 parser.add_argument("--n", help="Number of mutations to run per file", \
                     default=1, type=int)
 args = parser.parse_args()
@@ -40,12 +40,12 @@ setting += '-'
 setting += ('COMPRESS' if args.cord=='compress' else 'DECOMPRESS')
 setting += '-1KB'
 benchmark_dir = basedir + 'afl_in/' + setting
-benchmark_dir_mutate = basedir + 'afl_in/mutate/' + setting
+benchmark_dir_mutate = basedir + 'afl_in/mutate/newonly/' + setting
 
 lzbench_binary_path = basedir + 'lzbench/lzbench'
-lzbench_result_path = basedir + args.algo + '_' + args.cord + '_' + 'lzbench_result.log'
+lzbench_result_path = basedir + args.algo + '_' + args.cord + '_' + 'lzbench_result_newonly.log'
 fuzz_result_path = basedir + 'result/' + args.algo + '_' + args.cord + '_' + \
-    'cycle' + str(args.queue_cycles) + '_n' + str(args.n) + '.csv'
+    'cycle' + str(args.queue_cycles) + '_n' + str(args.n) + 'newonly.csv'
 file_queue_dict = dict()
 perf_dict = dict()
 
@@ -115,7 +115,7 @@ def main():
         # filename is like '009488_cl1_ws10'
         comp_level = int(filename.split('_')[1][2:])
         filepath = benchmark_dir + '/' + filename
-        throughput, uncomp_size, comp_ratio = run_lzbench(filepath, args.cord)
+        throughput, comp_ratio, uncomp_size = run_lzbench(filepath, args.cord)
         perf_dict[int(throughput)//10] = throughput    
         file_queue_dict[filename] = \
             [{'original_file': filename, 
@@ -140,43 +140,43 @@ def main():
             filecount += 1
             if filecount % 1000 == 0:
                 print('filecount is ', filecount, datetime.now().time())
-            # Select a file from the last queue cycle (most recent version)
+            # Select a file only from the last queue cycle.
             most_recent_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
                 str(file_queue_dict[filename][-1]['mutation_cycle'])
             most_recent_filepath = benchmark_dir_mutate + '/' + most_recent_filename
             new_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
                 str(file_queue_dict[filename][-1]['mutation_cycle']+1)
             new_filepath = benchmark_dir_mutate + '/' + new_filename
+            if file_queue_dict[filename][-1]['mutation_cycle']+1 == queue_cycle:
+                # Copy the original file
+                subprocess.run(f"cp {most_recent_filepath} {new_filepath}", \
+                            shell=True)
+                
+                # Mutate the file n times
+                for i in range(args.n):
+                    havoc(rand_below(65), new_filepath)
 
-            # Copy the original file
-            subprocess.run(f"cp {most_recent_filepath} {new_filepath}", \
-                        shell=True)
-            
-            # Mutate the file n times
-            for i in range(args.n):
-                havoc(rand_below(65), new_filepath)
+                # Run lzbench on the new file
+                comp_level = int(new_filename.split('_')[1][2:])
+                # comp_level should match filename or most_recent_filename's split('_')[1][2:]
+                throughput, uncomp_size, comp_ratio = run_lzbench(new_filepath, args.cord)
 
-            # Run lzbench on the new file
-            comp_level = int(new_filename.split('_')[1][2:])
-            # comp_level should match filename or most_recent_filename's split('_')[1][2:]
-            throughput, comp_ratio, uncomp_size = run_lzbench(new_filepath, args.cord)
-
-            # If the new file is unique, add to the queue
-            # Otherwise, discard
-            if int(throughput)//10 not in perf_dict.keys():
-                perf_dict[int(throughput)//10] = throughput
-                original_filename = file_queue_dict[filename][-1]['original_file']
-                assert filename==original_filename, "filename should match with original_filename"
-                file_queue_dict[filename].append(
-                    {'original_file': original_filename, 
-                    'throughput': throughput, 
-                    'comp_ratio': comp_ratio, 
-                    'uncomp_size': uncomp_size, 
-                    'comp_level': comp_level,
-                    'mutation_cycle': queue_cycle})
-                new_file_count += 1
-            else:
-                subprocess.run(f"rm {new_filepath}", shell=True)
+                # If the new file is unique, add to the queue
+                # Otherwise, discard
+                if int(throughput)//10 not in perf_dict.keys():
+                    perf_dict[int(throughput)//10] = throughput
+                    original_filename = file_queue_dict[filename][-1]['original_file']
+                    assert filename==original_filename, "filename should match with original_filename"
+                    file_queue_dict[filename].append(
+                        {'original_file': original_filename, 
+                        'throughput': throughput, 
+                        'comp_ratio': comp_ratio, 
+                        'uncomp_size': uncomp_size, 
+                        'comp_level': comp_level,
+                        'mutation_cycle': queue_cycle})
+                    new_file_count += 1
+                else:
+                    subprocess.run(f"rm {new_filepath}", shell=True)
 
         # Checkpoint the results per every queue cycle
         print('New files found: ', new_file_count)

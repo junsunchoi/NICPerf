@@ -24,7 +24,6 @@ MAX_FILE = 1024 * 1024 #Max file size = 1MB
 
 def choose_block_len(limit, queue_cycle=2, takes_too_long=False):
     # TODO: Need afl->queue_cycle and afl->run_over10m
-
     rlim = min(queue_cycle, 3)
     if takes_too_long:
         rlim = 1 # If it takes too long, choose a short block length
@@ -59,7 +58,7 @@ def havoc(r, filename):
             # Get the size of the file in bits
             file_size_bits = os.path.getsize(filename) * 8
             # Pick a random bit position
-            bit_pos = rand_below(file_size_bits)+1
+            bit_pos = rand_below(file_size_bits)
             f.seek(bit_pos // 8)
 
             # Read the byte at the current position

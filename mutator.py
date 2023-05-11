@@ -268,7 +268,7 @@ def havoc(r, filename):
         with open(filename, "rb") as f:
             data = bytearray(f.read())
         file_size_bytes = len(data)
-        if file_size_bytes >= 2:
+        if file_size_bytes >= 256: # Lower bound on file size
             delete_len = choose_block_len(int(file_size_bytes/2)-1) # Save at least half of the file
             delete_from = rand_below(file_size_bytes-delete_len+1)
             data[delete_from:delete_from+delete_len] = \

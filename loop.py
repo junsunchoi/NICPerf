@@ -24,8 +24,6 @@ from mutator import havoc
 # or only for the files that are newly added to the queue?
 # --> Newly added files only.
 
-# Assume that this file is at "~/fuzz"
-
 basedir = '/home/junsun2/fuzz/'
 benchmark_dir = basedir + 'afl_in/ZSTD-DECOMPRESS-1KB' #'extracted_benchmarks/ZSTD-DECOMPRESS-1KB'
 benchmark_dir_mutate = basedir + 'afl_in/mutate/ZSTD-DECOMPRESS-1KB'
@@ -33,28 +31,30 @@ benchmark_dir_mutate = basedir + 'afl_in/mutate/ZSTD-DECOMPRESS-1KB'
 lzbench_binary_path = basedir + 'lzbench/lzbench'
 lzbench_result_path = basedir + 'lzbench_result.log'
 fuzz_result_path = basedir + 'fuzz_result.csv'
+file_queue_dict = dict()
+perf_dict = dict()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--algo", help="zstd or snappy", default="zstd", type=str)
 parser.add_argument("--cord", help="compress or decompress", default="decompress", type=str)
 parser.add_argument("--queue-cycles", help="Queue cycles for the whole benchmark files", \
-                    default=10, type=int)
+                    default=2, type=int)
 parser.add_argument("--n", help="Number of mutations to run per file", \
                     default=1, type=int)
 args = parser.parse_args()
 
 # Algorithm should be a string all in small cases
 # Return throughput and compression ratio
-def run_lzbench(input_file, compress_or_decompress):
+def run_lzbench(input_path, compress_or_decompress):
     command = None
     if args.algo == 'zstd':
-        comp_level = int(input_file.split('_')[1][2:])
+        comp_level = int(input_path.split('/')[-1].split('_')[1][2:])
         result = subprocess.run(\
-        f"{lzbench_binary_path} -ezstd,{comp_level} -t1,1 -o4 {benchmark_dir}/{input_file} > {lzbench_result_path}", \
+        f"{lzbench_binary_path} -ezstd,{comp_level} -t1,1 -o4 {input_path} > {lzbench_result_path}", \
         shell=True)
     elif args.algo == 'snappy':
         result = subprocess.run(\
-        f"{lzbench_binary_path} -esnappy -t1,1 -o4 {benchmark_dir}/{input_file} > {lzbench_result_path}", \
+        f"{lzbench_binary_path} -esnappy -t1,1 -o4 {input_path} > {lzbench_result_path}", \
         shell=True)
     
     # lzbench_result.log format is like:
@@ -88,11 +88,11 @@ def main():
     # Create a queue.
     # Each element is a list of dictionaries of the following format:
     # [original_file, throughput, uncomp_size, comp_ratio, comp_level, mutation cycle]
-    file_queue_dict = dict()
+    # file_queue_dict = dict()
 
     # Create a list of performance numbers
     # Contain only 1 file per 10MB/s (ex: 100~110MB/s)
-    perf_dict = dict()
+    # perf_dict = dict()
     new_file_count = 0
 
     filelist = os.listdir(benchmark_dir)
@@ -108,7 +108,8 @@ def main():
             print('filecount is ', filecount, datetime.now().time())
         # filename is like '009488_cl1_ws10'
         comp_level = int(filename.split('_')[1][2:])
-        throughput, comp_ratio, uncomp_size = run_lzbench(filename, args.cord)
+        filepath = benchmark_dir + '/' + filename
+        throughput, comp_ratio, uncomp_size = run_lzbench(filepath, args.cord)
         perf_dict[int(throughput)//10] = throughput    
         file_queue_dict[filename] = \
             [{'original_file': filename, 
@@ -136,13 +137,13 @@ def main():
             # Select a file from the last queue cycle (most recent version)
             most_recent_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
                 str(file_queue_dict[filename][-1]['mutation_cycle'])
-            most_recent_filepath = benchmark_dir + '/' + most_recent_filename
+            most_recent_filepath = benchmark_dir_mutate + '/' + most_recent_filename
             new_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
                 str(file_queue_dict[filename][-1]['mutation_cycle']+1)
-            new_filepath = benchmark_dir + '/' + new_filename
+            new_filepath = benchmark_dir_mutate + '/' + new_filename
 
             # Copy the original file
-            subprocess.run(f"cp {most_recent_filepath} {new_filepath}/", \
+            subprocess.run(f"cp {most_recent_filepath} {new_filepath}", \
                         shell=True)
             
             # Mutate the file n times
@@ -151,7 +152,7 @@ def main():
 
             # Run lzbench on the new file
             comp_level = int(new_filename.split('_')[1][2:])
-            throughput, comp_ratio, uncomp_size = run_lzbench(new_filename)
+            throughput, comp_ratio, uncomp_size = run_lzbench(new_filepath, args.cord)
 
             # If the new file is unique, add to the queue
             # Otherwise, discard
@@ -169,8 +170,9 @@ def main():
             else:
                 subprocess.run(f"rm {new_filepath}", shell=True)
 
-    print('New files found: ', new_file_count)
-    write_result(file_queue_dict)
+        # Checkpoint the results per every queue cycle
+        print('New files found: ', new_file_count)
+        write_result(file_queue_dict)
     
 if __name__ == "__main__":
     main()

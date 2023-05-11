@@ -12,7 +12,7 @@ args = parser.parse_args()
 basedir = '/home/junsun2/fuzz/'
 fuzz_result_path = basedir + 'result/' + args.algo + '_' + args.cord + '_' + \
     'cycle' + str(args.queue_cycles) + '_n' + str(args.n)
-fuzz_result_path += '_newonly.csv' if args.newonly else '.csv'
+fuzz_result_path += 'newonly.csv' if args.newonly else '.csv'
 
 import pandas as pd
 import numpy as np

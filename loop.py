@@ -45,7 +45,7 @@ setting = ''
 setting += ('ZSTD' if args.algo=='zstd' else 'Snappy')
 setting += '-'
 setting += ('COMPRESS' if args.cord=='compress' else 'DECOMPRESS')
-setting += '-4KBplus' if args.bigfiles else '-1KB'
+setting += '-big' if args.bigfiles else '-1KB'
 benchmark_dir = basedir + 'afl_in/' + setting
 benchmark_dir_mutate = basedir + 'afl_in/mutate/newonly/' + setting \
     if args.newonly else \
@@ -54,12 +54,13 @@ benchmark_dir_mutate = basedir + 'afl_in/mutate/newonly/' + setting \
 lzbench_binary_path = basedir + 'lzbench/lzbench'
 lzbench_result_path = basedir + 'lzbench_result/' + args.algo + '_' + args.cord + '_' + \
     'cycle' + str(args.queue_cycles) + '_n' + str(args.n)
-lzbench_result_path += ('_4KBplus_' if args.bigfiles else '_')
+lzbench_result_path += ('_big_' if args.bigfiles else '_')
 lzbench_result_path += 'lzbench_result' + ('newonly.log' if args.newonly else '.log')
 fuzz_result_path = basedir + 'result/' + args.algo + '_' + args.cord + '_' + \
     'cycle' + str(args.queue_cycles) + '_n' + str(args.n)
-fuzz_result_path += ('_4KBplus_' if args.bigfiles else '_')
-fuzz_result_path += '._newonly.csv' if args.newonly else '.csv'
+if args.bigfiles:
+    fuzz_result_path += '_big'
+fuzz_result_path += '_newonly.csv' if args.newonly else '.csv'
 file_queue_dict = dict()
 perf_dict = dict()
 
@@ -91,7 +92,7 @@ def run_lzbench(input_path, compress_or_decompress):
         uncomp_size = int(third_line.split(',')[3])
         comp_ratio = float(third_line.split(',')[5])
         
-    return throughput, uncomp_size, comp_ratio
+    return throughput, comp_ratio, uncomp_size
 
 def write_result(file_queue_dict):
     with open(fuzz_result_path, 'w') as file:
@@ -185,9 +186,7 @@ def main():
 
                 # If the new file is unique, add to the queue
                 # Otherwise, discard
-                # Check if comp ratio is in a valid range
-                if int(throughput)//10 not in perf_dict.keys(): #\
-                    #and 0 <= comp_ratio <= 110:
+                if int(throughput)//10 not in perf_dict.keys(): 
                     perf_dict[int(throughput)//10] = throughput
                     original_filename = file_queue_dict[filename][-1]['original_file']
                     assert filename==original_filename, "filename should match with original_filename"

@@ -270,7 +270,7 @@ def havoc(r, filename):
             data = bytearray(f.read())
         file_size_bytes = len(data)
         if file_size_bytes >= 2:
-            delete_len = choose_block_len(file_size_bytes-1)
+            delete_len = choose_block_len(int(file_size_bytes/2)-1) # Save at least half of the file
             delete_from = rand_below(file_size_bytes-delete_len+1)
             data[delete_from:delete_from+delete_len] = \
                 data[delete_from+delete_len:file_size_bytes]

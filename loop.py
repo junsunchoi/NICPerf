@@ -43,7 +43,8 @@ benchmark_dir = basedir + 'afl_in/' + setting
 benchmark_dir_mutate = basedir + 'afl_in/mutate/' + setting
 
 lzbench_binary_path = basedir + 'lzbench/lzbench'
-lzbench_result_path = basedir + args.algo + '_' + args.cord + '_' + 'lzbench_result.log'
+lzbench_result_path = basedir + args.algo + '_' + args.cord + '_' + \
+    'cycle' + str(args.queue_cycles) + '_n' + str(args.n) + 'lzbench_result.log'
 fuzz_result_path = basedir + 'result/' + args.algo + '_' + args.cord + '_' + \
     'cycle' + str(args.queue_cycles) + '_n' + str(args.n) + '.csv'
 file_queue_dict = dict()
@@ -145,7 +146,7 @@ def main():
                 str(file_queue_dict[filename][-1]['mutation_cycle'])
             most_recent_filepath = benchmark_dir_mutate + '/' + most_recent_filename
             new_filename = file_queue_dict[filename][-1]['original_file'] + '--' + \
-                str(file_queue_dict[filename][-1]['mutation_cycle']+1)
+                str(queue_cycle)
             new_filepath = benchmark_dir_mutate + '/' + new_filename
 
             # Copy the original file
